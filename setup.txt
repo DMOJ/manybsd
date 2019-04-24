@@ -1,0 +1,45 @@
+# For x86_64 build
+wget ftp://ftp-archive.freebsd.org/pub/FreeBSD-Archive/old-releases/amd64/ISO-IMAGES/6.0/6.0-RELEASE-amd64-disc1.iso
+CDROM=6.0-RELEASE-amd64-disc1.iso
+HDD=freebsd-6.0-amd64.qcow2
+QEMU='qemu-system-x86_64 -enable-kvm'
+
+# For i386 build
+wget ftp://ftp-archive.freebsd.org/pub/FreeBSD-Archive/old-releases/i386/ISO-IMAGES/6.0/6.0-RELEASE-i386-disc1.iso
+CDROM=6.0-RELEASE-i386-disc1.iso
+HDD=freebsd-6.0-i386.qcow2
+QEMU='qemu-system-i386'
+
+# apt install qemu
+qemu-img create -f qcow2 ${HDD} 10G
+
+# Install:
+# DO NOT install FreeBSD boot manager
+# DO NOT install ports
+${QEMU} -curses -boot d -cdrom ${CDROM} -m 3072 -hda ${HDD}
+
+# General running:
+${QEMU} -curses -device virtio-rng-pci -drive format=qcow2,file=${HDD} -device e1000,netdev=user.0 -netdev user,id=user.0,hostfwd=tcp::2222-:22
+
+# Headless, for running builds via SSH:
+# ${QEMU} -nographic -serial file:qemu.log -device virtio-rng-pci -drive format=qcow2,file=${HDD} -device e1000,netdev=user.0 -netdev user,id=user.0,hostfwd=tcp::2222-:22
+
+# In client
+# dhclient em0
+echo 'ifconfig_em0="DHCP"' >> /etc/rc.conf
+
+# PermitRootLogin yes in /etc/ssh/sshd_config
+/etc/rc.d/sshd restart 
+
+# Make machine boot without waiting, in /boot/loader.conf add:
+echo 'autoboot_delay="0"' >> /boot/loader.conf
+echo 'beastie_disable="YES"' >> /boot/loader.conf
+# If running with KVM:
+echo 'acpi_load="NO"' >> /boot/loader.conf
+echo 'hint.acpi.0.disabled="1"' >> /boot/loader.conf
+
+# Setup passwordless SSH
+mkdir .ssh
+echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC61y6iV9qVHh3tFtZXNaBoMXTOsJrlph/aVX0Wb48T22Ny5mlR6h+ZhyDlzyPK5LnOtlYTHMnke1vZL5ULoCorXL84NtvvT2tM5NirgsPgaXbRYYbhWMntSLeJrsmdMmlgaENtM25Tl27Xu1mP617pkGItFKVImjtnz4j0Tn2oUOujlz/NsGuisiMxWy/so3MdhBhHXUnn4v6BMnJ538walRfUCOQLJ6BS0oSfBySRshL/gyCgA1fdQ7xfaTuSQ8kUQJdjI18S2L+M9GcD63wvzLEgKgEHjilO5gNzvoO1mgEXM4IGm0wLbBEQZbcSRBqxGBrPljDQq4w5p4i5vpWV root@freebsd' >> .ssh/authorized_keys
+chmod 400 .ssh/authorized_keys
+mkdir /build
